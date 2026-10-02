@@ -1,11 +1,16 @@
 import express from 'express';
-import { approve, assets, budgetLines, contracts, createApproval, dashboard, projectSummary, projects, rightsConflicts } from './domain.js';
+import { approve, assets, budgetLines, contracts, createApproval, dashboard, deliveries, DomainError, lockAsset, projectSummary, projects, replaceAsset, rightsConflicts, rollbackAsset } from './domain.js';
 const app = express(); app.use(express.json());
+const domain = (res: express.Response, fn: () => unknown) => { try { res.json(fn()); } catch (error) { if (error instanceof DomainError) return res.status(error.code === 'ASSET_NOT_FOUND' ? 404 : 409).json({ message: error.message, code: error.code }); throw error; } };
 app.get('/api/dashboard', (_req, res) => res.json(dashboard()));
 app.get('/api/projects', (_req, res) => res.json(projects));
 app.get('/api/projects/:id/summary', (req, res) => { const result = projectSummary(req.params.id); if (!result.project) return res.status(404).json({ message: '项目不存在' }); res.json(result); });
 app.get('/api/projects/:id/rights-conflicts', (req, res) => res.json(rightsConflicts(req.params.id)));
 app.get('/api/projects/:id/assets', (req, res) => res.json(assets.filter(asset => asset.projectId === req.params.id)));
+app.get('/api/projects/:id/deliveries', (req, res) => res.json(deliveries.filter(delivery => delivery.projectId === req.params.id)));
+app.post('/api/assets/:id/lock', (req, res) => domain(res, () => lockAsset(req.params.id, req.body || {})));
+app.post('/api/assets/:id/replace', (req, res) => domain(res, () => replaceAsset(req.params.id, req.body || {})));
+app.post('/api/assets/:id/rollback', (req, res) => domain(res, () => rollbackAsset(req.params.id, req.body || {})));
 app.get('/api/projects/:id/contracts', (req, res) => res.json(contracts.filter(contract => contract.projectId === req.params.id)));
 app.get('/api/budgets/:projectId/lines', (req, res) => res.json(budgetLines.filter(line => line.projectId === req.params.projectId)));
 app.post('/api/approvals', (req, res) => res.status(201).json(createApproval(req.body)));
